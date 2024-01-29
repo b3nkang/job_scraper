@@ -3,7 +3,13 @@ from bs4 import BeautifulSoup
 import instructor
 from openai import OpenAI
 from pydantic import BaseModel
+from dotenv import load_dotenv
+import os
 
+
+load_dotenv()
+
+api_key = os.getenv('OPENAI_API_KEY')
 client = instructor.patch(OpenAI())
 
 class JobDetails(BaseModel):
