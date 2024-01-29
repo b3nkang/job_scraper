@@ -6,6 +6,10 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 import pytest
+import pprint
+from pprint import PrettyPrinter
+
+printer = PrettyPrinter()
 
 load_dotenv()
 
