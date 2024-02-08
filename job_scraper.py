@@ -30,17 +30,48 @@ class JobDetails(BaseModel):
     currency: str = ''
     min_qualifications: str = ''
 
+# def scrape_job_posting(url):
+#     response = requests.get(url)
+
+#     if response.status_code == 200:
+#         print("successfully fetched from url")
+#         soup = BeautifulSoup(response.text, "lxml").get_text() # using lxml parser for speed + leniency
+#         print(soup)
+#         return soup
+        
+#     else:
+#         print(f"failed to fetch from url, {response.status_code}")
+    
 def scrape_job_posting(url):
     response = requests.get(url)
 
     if response.status_code == 200:
-        print("successfully fetched from url")
-        soup = BeautifulSoup(response.text, "lxml")	# using lxml parser for speed + leniency
-        print(soup)
-        return soup
+        print("Successfully fetched from URL")
+        soup = BeautifulSoup(response.text, "lxml")
+        # print(soup)
+        # print("\n\n\n")
+        
+        for header in soup.find_all('header'):
+            header.extract()
+
+        for footer in soup.find_all('footer'):
+            footer.extract()
+
+        for nav in soup.find_all('nav'):
+            nav.extract()
+
+        main_content = soup.find(['main', 'article'])  # Adjust based on common tags
+        if not main_content:
+            main_content = soup  # Fallback to the full content if specific content not found
+            
+        text = main_content.get_text(separator="\n", strip=True)  # Get cleaned text
+        print(text)
+        return text
         
     else:
-        print(f"failed to fetch from url, {response.status_code}")
+        print(f"Failed to fetch from URL, {response.status_code}")
+
+
 
 def extract_job_posting(html):
     job: JobDetails = client.chat.completions.create(
@@ -53,29 +84,31 @@ def extract_job_posting(html):
     )
     return job
 
-# attempted method for chunking
-def extract_job_posting_chunks(html):
+# # attempted method for chunking
+# def extract_job_posting_chunks(html):
 
-    chunks = []
-    for section in # unsure how to chunk here :
-        chunks.append(str(section))
+#     chunks = []
+#     for section in # unsure how to chunk here :
+#         chunks.append(str(section))
 
-    job = JobDetails()
+#     job = JobDetails()
 
-    for chunk in chunks:
-        partial = client.create_completion(
-            model="gpt-4",
-            prompt=f"Extract all given/specified details for the following job listing HTML section: {chunk}",
-            max_tokens=1000
-        ).choices[0].text.strip()
+#     for chunk in chunks:
+#         partial = client.create_completion(
+#             model="gpt-4",
+#             prompt=f"Extract all given/specified details for the following job listing HTML section: {chunk}",
+#             max_tokens=1000
+#         ).choices[0].text.strip()
 
-        # also having issues linking partial output to jobdetails model, but not high priority for now
+#         # also having issues linking partial output to jobdetails model, but not high priority for now
 
-        return job
+#         return job
 
 
+# scrape_job_posting('https://webscraper.io/jobs')
+scrape_job_posting('https://jobs.dropbox.com/listing/5582567')
 
 # print(extract_job_posting(scrape_job_posting('https://jobs.dropbox.com/listing/5582567')).model_dump_json(indent=4))
-print(extract_job_posting(scrape_job_posting('https://webscraper.io/jobs')).model_dump_json(indent=4))
+# print(extract_job_posting(scrape_job_posting('https://webscraper.io/jobs')).model_dump_json(indent=4))
 
 
