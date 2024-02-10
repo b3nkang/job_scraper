@@ -20,7 +20,7 @@ client = instructor.patch(OpenAI(api_key=api_key))
 class JobDetails(BaseModel):
     job_title: str = ''
     # job_url: str = '' # remove url, manually add later
-    company_id: str = ''
+    company_name: str = ''
     city: str = ''
     state: str = ''
     country: str = ''
@@ -29,7 +29,7 @@ class JobDetails(BaseModel):
     salary_upper_bound: str = ''
     salary_frequency: str = ''
     currency: str = ''
-    min_qualifications: str = ''
+    minimum_qualifications: str = ''
 
     def update(self, new_data: 'JobDetails') -> 'JobDetails':
         for field, value in new_data.model_dump().items():
@@ -133,7 +133,12 @@ def extract_job_posting_chunks(chunk_list: List[str], url : str):
                     You are given the current known metadata of a job listing, and you must update the metadata
                     as much as possible given your new information. If you do not know, leave the appropriate field blank. If you
                     are uncertain, add it in. If you see a field that currently has metadata which you think could better improved,
-                    given your current chunk of the job listing, update it if you believe it to be more apt.""",
+                    given your current chunk of the job listing, update it if you believe it to be more apt.
+                    
+                    There are also a few restrictions: do not update the city, state, and country fields unless you are *decently confident* that
+                    your selected information corresponds to the selected field. Instead of putting "remote" in the "work_arrangement"
+                    field, I have seen you put it in the "city" field, and correspondingly, the country "US" into the "state" field. 
+                    Please be certain when you fill the location fields.""",
                 },
                 {
                     "role": "user",
@@ -174,37 +179,5 @@ def scrape(url:str):
 
 
 scrape('https://jobs.dropbox.com/listing/5582567')
-    
-
-
-
-
-# scraped_text = scrape_job_posting('https://jobs.dropbox.com/listing/5582567')
-# print(scraped_text)
-# print(len(scraped_text))
-# print(type(scraped_text))
-# chunked_text = sliding_window(scraped_text, 1500, 750)
-
-# job_details = extract_job_posting_chunks(chunked_text)
-# print(job_details.model_dump_json(indent=4))
-
-
-# original chunking
-# def extract_job_posting(html):
-#     job: JobDetails = client.chat.completions.create(
-#         model="gpt-4-0125-preview",
-#         response_model=JobDetails,
-#         messages=[
-#             {"role": "user", "content": "Extract all given/specified details for the following job listing html page. If a certain field is not provided (namely the city/state/country or if no company ID is given), simply leave the field blank. Please also note 'salary frequency' refers to the time period for the given rate (per hour? month? year?): " + str(html)},
-            
-#         ]
-#     )
-#     return job
-
-# scrape_job_posting('https://webscraper.io/jobs')
-# scrape_job_posting('https://jobs.dropbox.com/listing/5582567')
-
-# print(extract_job_posting(scrape_job_posting('https://jobs.dropbox.com/listing/5582567')).model_dump_json(indent=4))
-# print(extract_job_posting(scrape_job_posting('https://webscraper.io/jobs')).model_dump_json(indent=4))
 
 
