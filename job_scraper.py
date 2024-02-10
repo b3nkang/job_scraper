@@ -19,7 +19,7 @@ client = instructor.patch(OpenAI(api_key=api_key))
 
 class JobDetails(BaseModel):
     job_title: str = ''
-    job_url: str = ''
+    # job_url: str = '' # remove url, manually add later
     company_id: str = ''
     city: str = ''
     state: str = ''
@@ -55,9 +55,9 @@ def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64
         main_content = soup.find(['main', 'article'])
         if main_content is None:
             main_content = soup 
-        text = main_content.get_text(separator="\n", strip=True)
+        text = main_content.get_text().replace('\n', ' ').replace('\r', ' ')
 
-        # print(text)
+        print(text)
 
         return text
     else:
@@ -81,13 +81,15 @@ def sliding_window(sequence, chunk_size, step=1):
         raise ValueError("Chunk size must be a positive integer")
     if step <= 0:
         raise ValueError("Step must be a positive integer")
-    
-    # Ensure chunk size is not larger than the sequence
-    if chunk_size > len(sequence):
-        raise ValueError("Chunk size cannot be larger than the sequence length")
-    
+        
     # Ben added:
     chunks = []
+
+    # Ensure chunk size is not larger than the sequence
+    if chunk_size > len(sequence):
+        chunks.append(sequence)
+        return chunks
+        # raise ValueError("Chunk size cannot be larger than the sequence length")
 
     # Slide the window over the sequence by 'step' elements each time and yield chunks
     for i in range(0, len(sequence) - chunk_size + 1, step):
@@ -96,7 +98,7 @@ def sliding_window(sequence, chunk_size, step=1):
     return chunks
 
 # attempted method for chunking
-def extract_job_posting_chunks(chunk_list: List[str]):
+def extract_job_posting_chunks(chunk_list: List[str], url : str):
 
     num_iterations = len(chunk_list)
     job = JobDetails()
@@ -105,12 +107,38 @@ def extract_job_posting_chunks(chunk_list: List[str]):
         new_updates = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
+                # {
+                #     "role": "user",
+                #     "content": """You are a job listing parser.
+                #     You are given the current known metadata of a job listing, and you must update the metadata
+                #     as much as possible given your new information. You will be given the job listing in CHUNKS, so 
+                #     please REMEMBER the pertinent details of the PREVIOUS CHUNKS, and, in addition to the supplied
+                #     information in the current known metadata. IF YOU DO NOT KNOW, LEAVE THE FIELD BLANK - MORE INFORMATION
+                #     WILL BE GIVEN IN FUTURE CHUNKS. DO NOT ADD INFORMATION THAT YOU ARE NOT GIVEN! IF A FIELD IS ALREADY 
+                #     FILLED, DO NOT CHANGE IT, *UNLESS* YOU ARE CERTAIN YOU HAVE COME ACROSS A MORE ACCURATE (THE *CORRECT*) 
+                #     FIELD THAT YOU WERE PREVIOUSLY UNSURE OF. Please also note 'salary frequency' refers to the time 
+                #     period for the given rate (per hour? month? year?).""",
+                # },
+                # {
+                #     "role": "user",
+                #     "content": """You are a job listing parser.
+                #     You are given the current known metadata of a job listing, and you must update the metadata
+                #     as much as possible given your new information. If you do not know, leave the appropriate field blank.
+                #     DO NOT ADD INFORMATION THAT YOU ARE NOT GIVEN! IF A FIELD IS ALREADY FILLED, DO NOT CHANGE IT! # too draconian
+                #     Please also note 'salary frequency' refers to the time period for the given rate (per hour? month? year?).""",
+                # },
                 {
-                    "role": "system",
-                    "content": """You are a job listing parser builder.
+                    "role": "user",
+                    "content": """You are a job listing parser.
                     You are given the current known metadata of a job listing, and you must update the metadata
-                    as much as possible given your new information. If you do not know, leave the appropriate field blank.
-                    Please also note 'salary frequency' refers to the time period for the given rate (per hour? month? year?).""",
+                    as much as possible given your new information. If you do not know, leave the appropriate field blank. If you
+                    are uncertain, add it in. If you see a field that currently has metadata which you think could better improved,
+                    given your current chunk of the job listing, update it if you believe it to be more apt.""",
+                },
+                {
+                    "role": "user",
+                    "content": f"""Here is the current state of the job metadata known so far:
+                    {job.model_dump_json(indent=2)}""",
                 },
                 {
                     "role": "user",
@@ -119,11 +147,6 @@ def extract_job_posting_chunks(chunk_list: List[str]):
 
                     {chunk}""",
                 },
-                {
-                    "role": "user",
-                    "content": f"""Here is the current state of the job metadata known so far:
-                    {job.model_dump_json(indent=2)}""",
-                },
             ],
             response_model=JobDetails,
         )
@@ -131,14 +154,39 @@ def extract_job_posting_chunks(chunk_list: List[str]):
         job = job.update(new_updates)
     return job
 
-scraped_text = scrape_job_posting('https://jobs.dropbox.com/listing/5582567')
-chunked_text = sliding_window(scraped_text, 1500, 750)
+def scrape(url:str):
+    scraped_text = scrape_job_posting(url)
+    chunked_text = ''
 
-print(chunked_text)
-print(len(chunked_text))
+    if (len(scraped_text) > 15000):
+        chunked_text = sliding_window(scraped_text, 15000, 750)
+    else:
+        chunked_text = sliding_window(scraped_text, len(scraped_text), 750)
 
-job_details = extract_job_posting_chunks(chunked_text)
-print(job_details.model_dump_json(indent=4))
+    print(chunked_text)
+    print(len(chunked_text))
+    print(type(chunked_text))
+
+    job_details = extract_job_posting_chunks(chunked_text, url)
+    print(job_details.model_dump_json(indent=4))
+
+    return job_details
+
+
+scrape('https://jobs.dropbox.com/listing/5582567')
+    
+
+
+
+
+# scraped_text = scrape_job_posting('https://jobs.dropbox.com/listing/5582567')
+# print(scraped_text)
+# print(len(scraped_text))
+# print(type(scraped_text))
+# chunked_text = sliding_window(scraped_text, 1500, 750)
+
+# job_details = extract_job_posting_chunks(chunked_text)
+# print(job_details.model_dump_json(indent=4))
 
 
 # original chunking
