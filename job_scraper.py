@@ -55,7 +55,8 @@ def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64
         main_content = soup.find(['main', 'article'])
         if main_content is None:
             main_content = soup 
-        text = main_content.get_text().replace('\n', ' ').replace('\r', ' ')
+
+        text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
 
         # print(text)
 
@@ -131,35 +132,17 @@ def extract_job_posting_chunks(chunk_list: List[str]):
                     # your selected information corresponds to the selected field. Instead of putting "remote" in the "work_arrangement"
                     # field, I have seen you put it in the "city" field, and correspondingly, the country "US" into the "state" field. 
                     # Please be certain when you fill the location fields.""",
-                
-                    #                 Make sure to look
-                    # for salary-related metadata, knowing that it might be provided in a monthly or yearly scale, ensuring to update
-                    # the 'salary_frequency' field for whether it is monthly, yearly, or some other time scale.""",
-
                 {
                     "role": "user",
                     "content": """You are a job listing parser.
                     You are given the current known metadata of a job listing, and you must update the metadata
-                    as much as possible given your new information. If you do not know, leave the appropriate field blank. If you
-                    are uncertain, add it in. If you see a field that currently has metadata which you think could better improved,
-                    given your current chunk of the job listing, update it if you believe it to be more apt. Do NOT 'make up' data 
-                    to fill into the job details, but if you SEE the text and the corresponding field, PUT IT IN. 
-                    
-                    Here is the structure of the metadata (JSON object), with guidance on what information should correspond to each field:
-
-                    {   
-                        "job_title": add the job title from the page, copied verbatim,
-                        "company_name": the official company name. note that it may not correspond to the website - a job lising for Meta is not 'meta careers', but Meta Inc.,
-                        "city": the city where the job is based,
-                        "state": the state where the job is based
-                        "country": the country where the job is based - note for this field and the previous two, a value may not be provided in the job listing, but look hard for one.,
-                        "work_arrangement": if the job is in-person, remote, work-from-home, flexible, hybrid, etc. Use whatever term the job listing uses.,
-                        "salary_lower_bound": if a salary range for the job is provided, put the lower bound here. if only one salary is given, leave the upper_bound empty and just fill this lower_bound field.,
-                        "salary_upper_bound": if a salary range for the job is provided, put the upper bound here.,
-                        "salary_frequency": if a salary for the job is provided, put whether it is monthly, yearly, or some other time scale in this field.,
-                        "currency": the currency of the income. note not all job listings may indicate this; if not, leave blank.,
-                        "minimum_qualifications": the minimum qualifications of the role. often this will be a separate section on the job listing, but if not provided, you may have to extrude them yourself, using your judgement. include more information than less, if you are forced to choose.
-                    }""",
+                    as much as possible given your new information that is provided. THE GOAL IS TO ADD AS MUCH DATA AS 
+                    POSSIBLE INTO THE FIELD, S0 REFRAIN FROM LEAVING FIELDS BLANK UNLESS YOU ARE ABSOLUTELY CERTAIN THE METADATA IS NOT
+                    PROVIDED BY THE JOB LISTING!! Even if you are uncertain that the data is correct, ADD IT IN!
+                    Do NOT 'make up' data to fill into the job details, but fill in AS MUCH AS POSSIBLE.
+                    Lastly, make sure to look
+                    for salary-related metadata, knowing that it might be provided in a monthly or yearly scale, ensuring to update
+                    the 'salary_frequency' field for whether it is monthly, yearly, or some other time scale.""",
                 },
                 {
                     "role": "user",
@@ -209,5 +192,22 @@ meta_listings = [
     "https://www.metacareers.com/v2/jobs/753482219988050/"
 ]
 
-for job_url in meta_listings:
+googlezon_listings = [
+    "https://www.amazon.jobs/en/jobs/2553629/software-development-engineer",
+    "https://www.amazon.jobs/en/jobs/2507446/area-manager-ii-miami-fl",
+    "https://www.amazon.jobs/en/jobs/2553845/strategic-account-manager",
+    "https://www.amazon.jobs/en/jobs/2556923/ehs-specialist",
+    "https://www.amazon.jobs/en/jobs/2556976/senior-product-manager-technical-global-supply-chain-technology",
+    "https://www.google.com/about/careers/applications/jobs/results/128066919761617606-cpu-formal-verification-engineer-google-cloud",
+    "https://www.google.com/about/careers/applications/jobs/results/74961970442183366-new-business-specialist-google-workspace",
+    "https://www.google.com/about/careers/applications/jobs/results/78114001709343430-aircraft-captain-and-project-manager",
+    "https://www.google.com/about/careers/applications/jobs/results/103906329636020934-pursuit-lead-google-cloud-consulting-gcc",
+    "https://www.google.com/about/careers/applications/jobs/results/75878479284839110-health-equity-clinical-specialist-google-health"
+]
+
+
+for job_url in googlezon_listings:
     scrape(job_url)
+
+# for job_url in meta_listings:
+#     scrape(job_url)
