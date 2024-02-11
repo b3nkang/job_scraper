@@ -57,7 +57,7 @@ def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64
             main_content = soup 
         text = main_content.get_text().replace('\n', ' ').replace('\r', ' ')
 
-        print(text)
+        # print(text)
 
         return text
     else:
@@ -98,7 +98,7 @@ def sliding_window(sequence, chunk_size, step=1):
     return chunks
 
 # attempted method for chunking
-def extract_job_posting_chunks(chunk_list: List[str], url : str):
+def extract_job_posting_chunks(chunk_list: List[str]):
 
     num_iterations = len(chunk_list)
     job = JobDetails()
@@ -127,18 +127,39 @@ def extract_job_posting_chunks(chunk_list: List[str], url : str):
                 #     DO NOT ADD INFORMATION THAT YOU ARE NOT GIVEN! IF A FIELD IS ALREADY FILLED, DO NOT CHANGE IT! # too draconian
                 #     Please also note 'salary frequency' refers to the time period for the given rate (per hour? month? year?).""",
                 # },
+                    #                 There are also a few restrictions: do not update the city, state, and country fields unless you are *decently confident* that
+                    # your selected information corresponds to the selected field. Instead of putting "remote" in the "work_arrangement"
+                    # field, I have seen you put it in the "city" field, and correspondingly, the country "US" into the "state" field. 
+                    # Please be certain when you fill the location fields.""",
+                
+                    #                 Make sure to look
+                    # for salary-related metadata, knowing that it might be provided in a monthly or yearly scale, ensuring to update
+                    # the 'salary_frequency' field for whether it is monthly, yearly, or some other time scale.""",
+
                 {
                     "role": "user",
                     "content": """You are a job listing parser.
                     You are given the current known metadata of a job listing, and you must update the metadata
                     as much as possible given your new information. If you do not know, leave the appropriate field blank. If you
                     are uncertain, add it in. If you see a field that currently has metadata which you think could better improved,
-                    given your current chunk of the job listing, update it if you believe it to be more apt.
+                    given your current chunk of the job listing, update it if you believe it to be more apt. Do NOT 'make up' data 
+                    to fill into the job details, but if you SEE the text and the corresponding field, PUT IT IN. 
                     
-                    There are also a few restrictions: do not update the city, state, and country fields unless you are *decently confident* that
-                    your selected information corresponds to the selected field. Instead of putting "remote" in the "work_arrangement"
-                    field, I have seen you put it in the "city" field, and correspondingly, the country "US" into the "state" field. 
-                    Please be certain when you fill the location fields.""",
+                    Here is the structure of the metadata (JSON object), with guidance on what information should correspond to each field:
+
+                    {   
+                        "job_title": add the job title from the page, copied verbatim,
+                        "company_name": the official company name. note that it may not correspond to the website - a job lising for Meta is not 'meta careers', but Meta Inc.,
+                        "city": the city where the job is based,
+                        "state": the state where the job is based
+                        "country": the country where the job is based - note for this field and the previous two, a value may not be provided in the job listing, but look hard for one.,
+                        "work_arrangement": if the job is in-person, remote, work-from-home, flexible, hybrid, etc. Use whatever term the job listing uses.,
+                        "salary_lower_bound": if a salary range for the job is provided, put the lower bound here. if only one salary is given, leave the upper_bound empty and just fill this lower_bound field.,
+                        "salary_upper_bound": if a salary range for the job is provided, put the upper bound here.,
+                        "salary_frequency": if a salary for the job is provided, put whether it is monthly, yearly, or some other time scale in this field.,
+                        "currency": the currency of the income. note not all job listings may indicate this; if not, leave blank.,
+                        "minimum_qualifications": the minimum qualifications of the role. often this will be a separate section on the job listing, but if not provided, you may have to extrude them yourself, using your judgement. include more information than less, if you are forced to choose.
+                    }""",
                 },
                 {
                     "role": "user",
@@ -168,16 +189,25 @@ def scrape(url:str):
     else:
         chunked_text = sliding_window(scraped_text, len(scraped_text), 750)
 
-    print(chunked_text)
-    print(len(chunked_text))
-    print(type(chunked_text))
+    # print(chunked_text)
+    # print(len(chunked_text))
+    # print(type(chunked_text))
 
-    job_details = extract_job_posting_chunks(chunked_text, url)
+    job_details = extract_job_posting_chunks(chunked_text)
     print(job_details.model_dump_json(indent=4))
 
     return job_details
 
 
-scrape('https://jobs.dropbox.com/listing/5582567')
+# scrape('https://jobs.dropbox.com/listing/5582567')
 
+meta_listings = [
+    "https://www.metacareers.com/jobs/291192177268974/",
+    "https://www.metacareers.com/v2/jobs/881223506664287/",
+    "https://www.metacareers.com/jobs/290152057043184/",
+    "https://www.metacareers.com/jobs/698403675596514/",
+    "https://www.metacareers.com/v2/jobs/753482219988050/"
+]
 
+for job_url in meta_listings:
+    scrape(job_url)
