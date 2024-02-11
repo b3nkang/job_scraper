@@ -25,8 +25,10 @@ class JobDetails(BaseModel):
     state: str = ''
     country: str = ''
     work_arrangement: str = ''
-    salary_lower_bound: str = ''
-    salary_upper_bound: str = ''
+    # salary_lower_bound: str = ''
+    # salary_upper_bound: str = ''
+    salary_lower_bound: int = 0
+    salary_upper_bound: int = 0
     salary_frequency: str = ''
     currency: str = ''
     minimum_qualifications: str = ''
@@ -106,7 +108,7 @@ def extract_job_posting_chunks(chunk_list: List[str]):
 
     for i, chunk in enumerate(chunk_list):
         new_updates = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-3.5-turbo-1106",
             messages=[
                 # {
                 #     "role": "user",
@@ -135,14 +137,9 @@ def extract_job_posting_chunks(chunk_list: List[str]):
                 {
                     "role": "user",
                     "content": """You are a job listing parser.
-                    You are given the current known metadata of a job listing, and you must update the metadata
-                    as much as possible given your new information that is provided. THE GOAL IS TO ADD AS MUCH DATA AS 
-                    POSSIBLE INTO THE FIELD, S0 REFRAIN FROM LEAVING FIELDS BLANK UNLESS YOU ARE ABSOLUTELY CERTAIN THE METADATA IS NOT
-                    PROVIDED BY THE JOB LISTING!! Even if you are uncertain that the data is correct, ADD IT IN!
-                    Do NOT 'make up' data to fill into the job details, but fill in AS MUCH AS POSSIBLE.
-                    Lastly, make sure to look
-                    for salary-related metadata, knowing that it might be provided in a monthly or yearly scale, ensuring to update
-                    the 'salary_frequency' field for whether it is monthly, yearly, or some other time scale.""",
+                    You are given the current known metadata of a job listing, and you must update the metadata as much as possible given the new information that is provided, which you must extarct detail out of. 
+                    ADD AS MUCH AS POSSIBLE INTO THE METADATA!! ***DO NOT LEAVE FIELDS BLANK!!*** Even if you are uncertain that the data is correct, ADD IT IN!
+                    Lastly, MAKE SURE TO LOOK FOR SALARY-RELATED METADATA, knowing that it might be provided in a monthly or yearly scale, ensuring to update the 'salary_frequency' field for whether it is monthly, yearly, or some other time scale. Take special note of any currency symbol (e.g. `$`) in the text, as that may be right next to the salary.""",
                 },
                 {
                     "role": "user",
@@ -151,7 +148,9 @@ def extract_job_posting_chunks(chunk_list: List[str]):
                 },
                 {
                     "role": "user",
-                    "content": f"""Extract any new job details from the following chunk of the job listing:
+                    "content": f"""Extract job details from the following chunk of the job listing.                     
+                    EXTRACT AS MUCH AS POSSIBLE!! REFRAIN FROM LEAVING *ANY* FIELDS BLANK!! TAKE YOUR TIME SO YOU DON'T MISS ANY PERTINENT DETAILS, ESPECIALLY THE SALARY UPPER AND LOWER BOUNDS!!
+
                     # Part {i}/{num_iterations} of the input:
 
                     {chunk}""",
@@ -182,7 +181,11 @@ def scrape(url:str):
     return job_details
 
 
-# scrape('https://jobs.dropbox.com/listing/5582567')
+# for i in range(5):
+
+deets = scrape('https://jobs.dropbox.com/listing/5582567')
+
+print(type(deets))
 
 meta_listings = [
     "https://www.metacareers.com/jobs/291192177268974/",
@@ -206,8 +209,8 @@ googlezon_listings = [
 ]
 
 
-for job_url in googlezon_listings:
-    scrape(job_url)
+# for job_url in meta_listings:
+#     scrape(job_url)
 
 # for job_url in meta_listings:
 #     scrape(job_url)
