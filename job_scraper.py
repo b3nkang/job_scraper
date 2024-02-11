@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 from typing import Any, Dict, List
+from collections import Counter
+import json
 import pytest
 import pprint
 from pprint import PrettyPrinter
@@ -100,7 +102,7 @@ def sliding_window(sequence, chunk_size, step=1):
     
     return chunks
 
-# attempted method for chunking
+# Extraction method
 def extract_job_posting_chunks(chunk_list: List[str]):
 
     num_iterations = len(chunk_list)
@@ -108,37 +110,13 @@ def extract_job_posting_chunks(chunk_list: List[str]):
 
     for i, chunk in enumerate(chunk_list):
         new_updates = client.chat.completions.create(
-            model="gpt-3.5-turbo-1106",
+            model="gpt-3.5-turbo-0125",
             messages=[
-                # {
-                #     "role": "user",
-                #     "content": """You are a job listing parser.
-                #     You are given the current known metadata of a job listing, and you must update the metadata
-                #     as much as possible given your new information. You will be given the job listing in CHUNKS, so 
-                #     please REMEMBER the pertinent details of the PREVIOUS CHUNKS, and, in addition to the supplied
-                #     information in the current known metadata. IF YOU DO NOT KNOW, LEAVE THE FIELD BLANK - MORE INFORMATION
-                #     WILL BE GIVEN IN FUTURE CHUNKS. DO NOT ADD INFORMATION THAT YOU ARE NOT GIVEN! IF A FIELD IS ALREADY 
-                #     FILLED, DO NOT CHANGE IT, *UNLESS* YOU ARE CERTAIN YOU HAVE COME ACROSS A MORE ACCURATE (THE *CORRECT*) 
-                #     FIELD THAT YOU WERE PREVIOUSLY UNSURE OF. Please also note 'salary frequency' refers to the time 
-                #     period for the given rate (per hour? month? year?).""",
-                # },
-                # {
-                #     "role": "user",
-                #     "content": """You are a job listing parser.
-                #     You are given the current known metadata of a job listing, and you must update the metadata
-                #     as much as possible given your new information. If you do not know, leave the appropriate field blank.
-                #     DO NOT ADD INFORMATION THAT YOU ARE NOT GIVEN! IF A FIELD IS ALREADY FILLED, DO NOT CHANGE IT! # too draconian
-                #     Please also note 'salary frequency' refers to the time period for the given rate (per hour? month? year?).""",
-                # },
-                    #                 There are also a few restrictions: do not update the city, state, and country fields unless you are *decently confident* that
-                    # your selected information corresponds to the selected field. Instead of putting "remote" in the "work_arrangement"
-                    # field, I have seen you put it in the "city" field, and correspondingly, the country "US" into the "state" field. 
-                    # Please be certain when you fill the location fields.""",
                 {
                     "role": "user",
                     "content": """You are a job listing parser.
                     You are given the current known metadata of a job listing, and you must update the metadata as much as possible given the new information that is provided, which you must extarct detail out of. 
-                    ADD AS MUCH AS POSSIBLE INTO THE METADATA!! ***DO NOT LEAVE FIELDS BLANK!!*** Even if you are uncertain that the data is correct, ADD IT IN!
+                    ADD AS MUCH AS POSSIBLE INTO THE METADATA!! Even if you are uncertain that the data is correct, ADD IT IN!
                     Lastly, MAKE SURE TO LOOK FOR SALARY-RELATED METADATA, knowing that it might be provided in a monthly or yearly scale, ensuring to update the 'salary_frequency' field for whether it is monthly, yearly, or some other time scale. Take special note of any currency symbol (e.g. `$`) in the text, as that may be right next to the salary.""",
                 },
                 {
@@ -162,6 +140,7 @@ def extract_job_posting_chunks(chunk_list: List[str]):
         job = job.update(new_updates)
     return job
 
+# Scrapes the given url, calls the extraction, and returns it as dict
 def scrape(url:str):
     scraped_text = scrape_job_posting(url)
     chunked_text = ''
@@ -171,23 +150,53 @@ def scrape(url:str):
     else:
         chunked_text = sliding_window(scraped_text, len(scraped_text), 750)
 
-    # print(chunked_text)
-    # print(len(chunked_text))
-    # print(type(chunked_text))
+    job_details = extract_job_posting_chunks(chunked_text).model_dump_json(indent=4)
 
-    job_details = extract_job_posting_chunks(chunked_text)
-    print(job_details.model_dump_json(indent=4))
+    # print(job_details)
 
-    return job_details
+    job_dict = json.loads(job_details)
 
+    return job_dict
 
-# for i in range(5):
+# Calls the scrape method multiple times for the same listing, then returns aggregated_dict with each value updated with the most common term
+def aggregate_scraped_results(url:str):
+    aggregated_dict = {
+        "job_title": [''],
+        "company_name": [''],
+        "city": [''],
+        "state": [''],
+        "country": [''],
+        "work_arrangement": [''],
+        "salary_lower_bound": [0],
+        "salary_upper_bound": [0],
+        "salary_frequency":  [''],
+        "currency":  [''],
+        "minimum_qualifications": ['']
+    }
 
-deets = scrape('https://jobs.dropbox.com/listing/5582567')
+    # populates aggregated_dict by appending the value arrays with each job's returned field
+    for i in range(5):
+        job_dict = scrape(url)
+        for field, response_array in aggregated_dict.items():
+            response_array.append(job_dict[field])
 
-print(type(deets))
+    # finds the most common value in the value array and reasssigns the aggregated_dict value to it
+    for field, response_array in aggregated_dict.items():
+        if (field == "minimum_qualifications"):
+            longest_string = max(response_array, key=len)
+            aggregated_dict[field] = longest_string
+        else:
+            array_count = Counter(response_array)
+            most_common_string, count = array_count.most_common(1)[0]
+            aggregated_dict[field] = most_common_string
 
-meta_listings = [
+        # attempt to ignore if most common is default
+        # most_common_strings = [string for string, count in array_count.items() if count == highest_count and string != omit_string]
+
+    printer.pprint(aggregated_dict)
+    return aggregated_dict
+
+meta_urls = [
     "https://www.metacareers.com/jobs/291192177268974/",
     "https://www.metacareers.com/v2/jobs/881223506664287/",
     "https://www.metacareers.com/jobs/290152057043184/",
@@ -195,7 +204,7 @@ meta_listings = [
     "https://www.metacareers.com/v2/jobs/753482219988050/"
 ]
 
-googlezon_listings = [
+googlezon_urls = [
     "https://www.amazon.jobs/en/jobs/2553629/software-development-engineer",
     "https://www.amazon.jobs/en/jobs/2507446/area-manager-ii-miami-fl",
     "https://www.amazon.jobs/en/jobs/2553845/strategic-account-manager",
@@ -208,9 +217,53 @@ googlezon_listings = [
     "https://www.google.com/about/careers/applications/jobs/results/75878479284839110-health-equity-clinical-specialist-google-health"
 ]
 
+applebox_urls = [
+    "https://jobs.dropbox.com/listing/5549315",
+    "https://jobs.dropbox.com/listing/5602475",
+    "https://jobs.dropbox.com/listing/5591895",
+    "https://jobs.dropbox.com/listing/5669452",
+    "https://jobs.dropbox.com/listing/5579581",
+    "https://jobs.apple.com/en-us/details/200524152/cellular-rf-software-intern-beijing?team=STDNT",
+    "https://jobs.apple.com/en-us/details/200537884/product-manager-apple-vision-pro?team=MKTG",
+    "https://jobs.apple.com/en-us/details/114438113/nl-operations-expert?team=SLDEV",
+    "https://jobs.apple.com/en-us/details/200538177/datacenter-critical-facilities-expert?team=OPMFG",
+    "https://jobs.apple.com/en-us/details/200538050/manufacturing-engineering-and-maintenance-manager?team=OPMFG"
+]
 
-# for job_url in meta_listings:
+microflix_urls = [
+    "https://jobs.careers.microsoft.com/global/en/job/1686122/Sales-Operations-Program-Manager",
+    "https://jobs.careers.microsoft.com/global/en/job/1683436/Director%2C-Business-Strategy",
+    "https://jobs.careers.microsoft.com/global/en/job/1681510/Customer-Success-Account-Management-Manager",
+    "https://jobs.careers.microsoft.com/global/en/job/1684262/Software-Engineer%3A-Internship-Opportunities-for-University-Students%2C-Vancouver%2C-BC",
+    "https://jobs.careers.microsoft.com/global/en/job/1683333/Environmental%2C-Health-%26-Safety-Manager",
+    "https://jobs.netflix.com/jobs/315373399",
+    "https://jobs.netflix.com/jobs/295471959",
+    "https://jobs.netflix.com/jobs/312154704",
+    "https://jobs.netflix.com/jobs/312862026",
+    "https://jobs.netflix.com/jobs/315586427"
+]
+
+intelforce_urls = [
+    "https://jobs.intel.com/en/job/santa-clara/logic-design-methodology-engineer-graduate-intern/41147/60740448336",
+    "https://jobs.intel.com/en/job/folsom/ethernet-architect/41147/60346795808",
+    "https://jobs.intel.com/en/job/santa-clara/soc-pre-silicon-validation-intern/41147/61023758688",
+    "https://jobs.intel.com/en/job/santa-clara/analog-design-engineering-manager/41147/61118846880",
+    "https://jobs.intel.com/en/job/folsom/component-debug-pre-si-dependency-and-quality-lead/41147/60809487664",
+    "https://careers.salesforce.com/en/jobs/jr238977/backend-software-engineer-slack/",
+    "https://careers.salesforce.com/en/jobs/jr239184/alliances-partner-account-manager-rcg/",
+    "https://careers.salesforce.com/en/jobs/jr236604/employee-success-business-partner-senior-analyst/",
+    "https://careers.salesforce.com/en/jobs/jr231359/employee-success-people-advisor/",
+    "https://careers.salesforce.com/en/jobs/jr238295/lead-solution-engineer-mulesoft-public-sector/"
+]
+
+# for job_url in meta_urls:
 #     scrape(job_url)
 
-# for job_url in meta_listings:
+# for job_url in googlezon_urls:
 #     scrape(job_url)
+
+for job_url in meta_urls:
+    aggregate_scraped_results(job_url)
+
+for job_url in googlezon_urls:
+    aggregate_scraped_results(job_url)
