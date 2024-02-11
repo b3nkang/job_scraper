@@ -61,7 +61,7 @@ def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64
             main_content = soup 
 
         text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
-
+        # print("main: "+ str(main_content))
         # print(text)
 
         return text
@@ -256,6 +256,8 @@ intelforce_urls = [
     "https://careers.salesforce.com/en/jobs/jr238295/lead-solution-engineer-mulesoft-public-sector/"
 ]
 
+# RUN THE ENTIRE THING FROM HERE BELOW, UNCOMMENT FOR THE SECTION YOU WANT TO RUN
+
 # for job_url in meta_urls:
 #     scrape(job_url)
 
@@ -267,3 +269,12 @@ for job_url in meta_urls:
 
 for job_url in googlezon_urls:
     aggregate_scraped_results(job_url)
+
+# for job_url in applebox_urls:
+#     aggregate_scraped_results(job_url)
+
+# for job_url in microflix_urls:
+#     aggregate_scraped_results(job_url)
+
+# for job_url in intelforce_urls:
+#     aggregate_scraped_results(job_url)
