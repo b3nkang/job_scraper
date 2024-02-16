@@ -42,31 +42,69 @@ class JobDetails(BaseModel):
         return self
 
 
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
+import time
+
+def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
+    options = Options()
+    options.headless = True
+    options.add_argument(f"user-agent={user_agent}")
+
+    driver = webdriver.Chrome(options=options)
+    driver.get(url)
+
+    # Wait for the document.readyState to be 'complete'
+    WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+
+    # Wait for AJAX calls as well here
+    time.sleep(2) #
+
+    soup = BeautifulSoup(driver.page_source, "lxml")
+
+    for tag in ['header', 'footer', 'nav']:
+        for element in soup.find_all(tag):
+            element.extract()
+
+    main_content = soup.find(['main', 'article'])
+    if main_content is None:
+        main_content = soup
+
+    text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
+
+    driver.quit()
+
+    return text
+
     
-def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'): # ChatGPT-suggested user-agent string
-    headers = {'User-Agent': user_agent}
+# def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'): # ChatGPT-suggested user-agent string
+#     headers = {'User-Agent': user_agent}
 
-    response = requests.get(url, headers=headers, timeout=10)
+#     response = requests.get(url, headers=headers, timeout=10)
 
-    if response.status_code == 200:
-        print("Successfully fetched from URL")
-        soup = BeautifulSoup(response.text, "lxml")
+#     if response.status_code == 200:
+#         print("Successfully fetched from URL")
+#         soup = BeautifulSoup(response.text, "lxml")
 
-        for tag in ['header', 'footer', 'nav']:
-            for element in soup.find_all(tag):
-                element.extract()
+#         for tag in ['header', 'footer', 'nav']:
+#             for element in soup.find_all(tag):
+#                 element.extract()
 
-        main_content = soup.find(['main', 'article'])
-        if main_content is None:
-            main_content = soup 
+#         main_content = soup.find(['main', 'article'])
+#         if main_content is None:
+#             main_content = soup 
 
-        text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
-        # print("main: "+ str(main_content))
-        # print(text)
+#         text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
+#         # print("main: "+ str(main_content))
+#         # print(text)
 
-        return text
-    else:
-        print(f"Failed to fetch from URL, status code: {response.status_code}")
+#         return text
+#     else:
+#         print(f"Failed to fetch from URL, status code: {response.status_code}")
 
 
 # stolen from slack
@@ -258,17 +296,21 @@ intelforce_urls = [
 
 # RUN THE ENTIRE THING FROM HERE BELOW, UNCOMMENT FOR THE SECTION YOU WANT TO RUN
 
+
+aggregate_scraped_results("https://jobs.netflix.com/jobs/315586427")
+
+
 # for job_url in meta_urls:
 #     scrape(job_url)
 
 # for job_url in googlezon_urls:
 #     scrape(job_url)
 
-for job_url in meta_urls:
-    aggregate_scraped_results(job_url)
+# for job_url in meta_urls:
+#     aggregate_scraped_results(job_url)
 
-for job_url in googlezon_urls:
-    aggregate_scraped_results(job_url)
+# for job_url in googlezon_urls:
+#     aggregate_scraped_results(job_url)
 
 # for job_url in applebox_urls:
 #     aggregate_scraped_results(job_url)
@@ -277,4 +319,4 @@ for job_url in googlezon_urls:
 #     aggregate_scraped_results(job_url)
 
 # for job_url in intelforce_urls:
-#     aggregate_scraped_results(job_url)
+#     aggregate_scraped_results(job_url)2
