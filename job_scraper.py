@@ -50,61 +50,58 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import time
 
-def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
-    options = Options()
-    options.headless = True
-    options.add_argument(f"user-agent={user_agent}")
 
-    driver = webdriver.Chrome(options=options)
-    driver.get(url)
+class SeleniumScraper:
+    def __init__(self, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument(f'user-agent={user_agent}')
+        self.driver = webdriver.Chrome(options=options)
 
-    # Wait for the document.readyState to be 'complete'
-    WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+    def scrape_job_text(self, url):
+        self.driver.get(url)
+        WebDriverWait(self.driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+        time.sleep(2)
+        soup = BeautifulSoup(self.driver.page_source, "lxml")
+        for tag in ['header', 'footer', 'nav']:
+            for element in soup.find_all(tag):
+                element.extract()
+        main_content = soup.find(['main', 'article']) or soup
+        text = main_content.get_text().replace('\n', ' ').replace('\r', ' ')
+        return text
 
-    # Wait for AJAX calls as well here
-    time.sleep(2) #
+    def close(self):
+        self.driver.quit()
 
-    soup = BeautifulSoup(driver.page_source, "lxml")
+# def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
+#     options = Options()
+#     options.add_argument('--headless')
+#     options.add_argument(f"user-agent={user_agent}")
 
-    for tag in ['header', 'footer', 'nav']:
-        for element in soup.find_all(tag):
-            element.extract()
+#     driver = webdriver.Chrome(options=options)
+#     driver.get(url)
 
-    main_content = soup.find(['main', 'article'])
-    if main_content is None:
-        main_content = soup
+#     # Wait for the document.readyState to be 'complete'
+#     WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
 
-    text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
+#     # Wait for AJAX calls as well here
+#     time.sleep(2) #
 
-    driver.quit()
+#     soup = BeautifulSoup(driver.page_source, "lxml")
 
-    return text
+#     for tag in ['header', 'footer', 'nav']:
+#         for element in soup.find_all(tag):
+#             element.extract()
 
-    
-# def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'): # ChatGPT-suggested user-agent string
-#     headers = {'User-Agent': user_agent}
+#     main_content = soup.find(['main', 'article'])
+#     if main_content is None:
+#         main_content = soup
 
-#     response = requests.get(url, headers=headers, timeout=10)
+#     text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
 
-#     if response.status_code == 200:
-#         print("Successfully fetched from URL")
-#         soup = BeautifulSoup(response.text, "lxml")
+#     driver.quit()
 
-#         for tag in ['header', 'footer', 'nav']:
-#             for element in soup.find_all(tag):
-#                 element.extract()
-
-#         main_content = soup.find(['main', 'article'])
-#         if main_content is None:
-#             main_content = soup 
-
-#         text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
-#         # print("main: "+ str(main_content))
-#         # print(text)
-
-#         return text
-#     else:
-#         print(f"Failed to fetch from URL, status code: {response.status_code}")
+#     return text
 
 
 # stolen from slack
@@ -179,7 +176,7 @@ def extract_job_posting_chunks(chunk_list: List[str]):
     return job
 
 # Scrapes the given url, calls the extraction, and returns it as dict
-def scrape(url:str):
+def scrape(selenium: SeleniumScraper, url:str):
     scraped_text = scrape_job_posting(url)
     chunked_text = ''
 
@@ -197,7 +194,7 @@ def scrape(url:str):
     return job_dict
 
 # Calls the scrape method multiple times for the same listing, then returns aggregated_dict with each value updated with the most common term
-def aggregate_scraped_results(url:str):
+def aggregate_scraped_results(selenium: SeleniumScraper, url:str):
     aggregated_dict = {
         "job_title": [''],
         "company_name": [''],
@@ -214,7 +211,7 @@ def aggregate_scraped_results(url:str):
 
     # populates aggregated_dict by appending the value arrays with each job's returned field
     for i in range(5):
-        job_dict = scrape(url)
+        job_dict = selenium.scrape(url)
         for field, response_array in aggregated_dict.items():
             response_array.append(job_dict[field])
 
@@ -297,7 +294,7 @@ intelforce_urls = [
 # RUN THE ENTIRE THING FROM HERE BELOW, UNCOMMENT FOR THE SECTION YOU WANT TO RUN
 
 
-aggregate_scraped_results("https://jobs.netflix.com/jobs/315586427")
+# aggregate_scraped_results("https://jobs.netflix.com/jobs/315586427")
 
 
 # for job_url in meta_urls:
@@ -312,11 +309,13 @@ aggregate_scraped_results("https://jobs.netflix.com/jobs/315586427")
 # for job_url in googlezon_urls:
 #     aggregate_scraped_results(job_url)
 
-# for job_url in applebox_urls:
-#     aggregate_scraped_results(job_url)
+scraper = SeleniumScraper()
 
-# for job_url in microflix_urls:
-#     aggregate_scraped_results(job_url)
+for job_url in applebox_urls:
+    aggregate_scraped_results(job_url)
 
-# for job_url in intelforce_urls:
-#     aggregate_scraped_results(job_url)2
+for job_url in microflix_urls:
+    aggregate_scraped_results(job_url)
+
+for job_url in intelforce_urls:
+    aggregate_scraped_results(job_url)
