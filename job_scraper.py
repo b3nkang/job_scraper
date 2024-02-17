@@ -57,6 +57,7 @@ class SeleniumScraper:
         options.add_argument('--headless')
         options.add_argument(f'user-agent={user_agent}')
         self.driver = webdriver.Chrome(options=options)
+        print("SELENIUM INSTANTIATED")
 
     def scrape_job_text(self, url) -> str:
         self.driver.get(url)
@@ -106,9 +107,9 @@ class SeleniumScraper:
             chunked_text = self.chunk_job_text(scraped_text, len(scraped_text), 750)
         
         job_json = extract_json(chunked_text).model_dump_json(indent=4)
-        # print(job_details)
+        # printer.pprint(job_json)
+        print("JOB PARSED")
         job_dict = json.loads(job_json)
-        
         return job_dict
 
     def close(self):
@@ -152,12 +153,8 @@ def extract_json(chunk_list: List[str]) -> JobDetails:
         job = job.update(new_updates)
     return job
 
-# sel = SeleniumScraper()
-
-
-
 # Calls the scrape method multiple times for the same listing, then returns aggregated_dict with each value updated with the most common term
-def aggregate_scraped_results(selenium: SeleniumScraper, url:str):
+def aggregate_scraped_results(selenium: SeleniumScraper, url:str) -> dict:
     aggregated_dict = {
         "job_title": [''],
         "company_name": [''],
@@ -178,6 +175,8 @@ def aggregate_scraped_results(selenium: SeleniumScraper, url:str):
         for field, response_array in aggregated_dict.items():
             response_array.append(job_dict[field])
 
+    print("\nAGGREGATED")
+    printer.pprint(aggregated_dict)
     # finds the most common value in the value array and reasssigns the aggregated_dict value to it
     for field, response_array in aggregated_dict.items():
         if (field == "minimum_qualifications"):
@@ -191,6 +190,7 @@ def aggregate_scraped_results(selenium: SeleniumScraper, url:str):
         # attempt to ignore if most common is default
         # most_common_strings = [string for string, count in array_count.items() if count == highest_count and string != omit_string]
 
+    print("\nAVERAGED")
     printer.pprint(aggregated_dict)
     return aggregated_dict
 
@@ -256,10 +256,6 @@ intelforce_urls = [
 
 # RUN THE ENTIRE THING FROM HERE BELOW, UNCOMMENT FOR THE SECTION YOU WANT TO RUN
 
-
-# aggregate_scraped_results("https://jobs.netflix.com/jobs/315586427")
-
-
 # for job_url in meta_urls:
 #     scrape(job_url)
 
@@ -272,13 +268,18 @@ intelforce_urls = [
 # for job_url in googlezon_urls:
 #     aggregate_scraped_results(job_url)
 
-scraper = SeleniumScraper()
+sel = SeleniumScraper()
 
-for job_url in applebox_urls:
-    aggregate_scraped_results(job_url)
+aggregate_scraped_results(sel, "https://jobs.netflix.com/jobs/315586427")
 
-for job_url in microflix_urls:
-    aggregate_scraped_results(job_url)
+# for job_url in meta_urls:
+#     aggregate_scraped_results(sel,job_url)
 
-for job_url in intelforce_urls:
-    aggregate_scraped_results(job_url)
+# for job_url in applebox_urls:
+#     aggregate_scraped_results(sel,job_url)
+
+# for job_url in microflix_urls:
+#     aggregate_scraped_results(sel,job_url)
+
+# for job_url in intelforce_urls:
+#     aggregate_scraped_results(sel,job_url)
