@@ -80,13 +80,12 @@ class SeleniumScraper:
         # print(1)
         # self.driver.get(url)
         # print(2)
-        self.driver.set_page_load_timeout(11)
+        self.driver.set_page_load_timeout(20)
         start_time = time.time()
         try:
             self.driver.get(url)
-            print(3)
             WebDriverWait(self.driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
-            print(4)
+            # time.sleep(5)
             load_time = time.time() - start_time
             print(f"Page loaded in {load_time} seconds")
         except TimeoutException:
@@ -95,7 +94,7 @@ class SeleniumScraper:
             return "Page load timeout"
 
         # time.sleep(3)
-        print(5)
+        # print(5)
         soup = BeautifulSoup(self.driver.page_source, "lxml")
         for tag in ['header', 'footer', 'nav']:
             for element in soup.find_all(tag):
@@ -144,8 +143,8 @@ class SeleniumScraper:
             chunked_text = self.chunk_job_text(scraped_text, len(scraped_text), 750)
         
         job_json = extract_json(chunked_text).model_dump_json(indent=4)
-        # printer.pprint(job_json)
-        print("JOB PARSED")
+        printer.pprint(job_json)
+        # print("JOB PARSED")
         job_dict = json.loads(job_json)
         return job_dict
 
@@ -303,9 +302,9 @@ intelforce_urls = [
 
 sel = SeleniumScraper()
 
-# sel.scrape_job_text("https://jobs.intel.com/en/job/santa-clara/logic-design-methodology-engineer-graduate-intern/41147/60740448336")
+print(sel.scrape_job_text("https://careers.salesforce.com/en/jobs/jr231359/employee-success-people-advisor/"))
 
-aggregate_scraped_results(sel, "https://jobs.intel.com/en/job/santa-clara/logic-design-methodology-engineer-graduate-intern/41147/60740448336")
+# aggregate_scraped_results(sel, "https://jobs.intel.com/en/job/santa-clara/logic-design-methodology-engineer-graduate-intern/41147/60740448336")
 
 # for job_url in meta_urls:
 #     aggregate_scraped_results(sel,job_url)
