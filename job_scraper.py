@@ -50,7 +50,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import time
 
-# a class to instantiate Selenium
+# a class to instantiate Selenium and parse a job listing. 
+# scrape_job_text() returns str of page text, 
+# chunk_job_text() returns list of str chunks, 
+# parse() calls extract_json to return the dict of job metadata.
 class SeleniumScraper:
     def __init__(self, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
         options = Options()
@@ -115,7 +118,7 @@ class SeleniumScraper:
     def close(self):
         self.driver.quit()
 
-# Extraction method
+# global method that sends the request to the OpenAI API and returns a serialized JobDetails dict.
 def extract_json(chunk_list: List[str]) -> JobDetails:
 
     num_iterations = len(chunk_list)
@@ -153,6 +156,7 @@ def extract_json(chunk_list: List[str]) -> JobDetails:
         job = job.update(new_updates)
     return job
 
+# The overall workflow method.
 # Calls the scrape method multiple times for the same listing, then returns aggregated_dict with each value updated with the most common term
 def aggregate_scraped_results(selenium: SeleniumScraper, url:str) -> dict:
     aggregated_dict = {
@@ -256,21 +260,9 @@ intelforce_urls = [
 
 # RUN THE ENTIRE THING FROM HERE BELOW, UNCOMMENT FOR THE SECTION YOU WANT TO RUN
 
-# for job_url in meta_urls:
-#     scrape(job_url)
-
-# for job_url in googlezon_urls:
-#     scrape(job_url)
-
-# for job_url in meta_urls:
-#     aggregate_scraped_results(job_url)
-
-# for job_url in googlezon_urls:
-#     aggregate_scraped_results(job_url)
-
 sel = SeleniumScraper()
 
-aggregate_scraped_results(sel, "https://jobs.netflix.com/jobs/315586427")
+# aggregate_scraped_results(sel, "https://jobs.netflix.com/jobs/315586427")
 
 # for job_url in meta_urls:
 #     aggregate_scraped_results(sel,job_url)
@@ -278,8 +270,8 @@ aggregate_scraped_results(sel, "https://jobs.netflix.com/jobs/315586427")
 # for job_url in applebox_urls:
 #     aggregate_scraped_results(sel,job_url)
 
-# for job_url in microflix_urls:
-#     aggregate_scraped_results(sel,job_url)
+for job_url in microflix_urls:
+    aggregate_scraped_results(sel,job_url)
 
 # for job_url in intelforce_urls:
 #     aggregate_scraped_results(sel,job_url)
