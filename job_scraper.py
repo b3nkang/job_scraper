@@ -48,6 +48,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+from selenium.common.exceptions import TimeoutException
 import time
 
 # a class to instantiate Selenium and parse a job listing. 
@@ -61,11 +62,40 @@ class SeleniumScraper:
         options.add_argument(f'user-agent={user_agent}')
         self.driver = webdriver.Chrome(options=options)
         print("SELENIUM INSTANTIATED")
+        self.timeout_dict = {
+            "job_title": 'Page load timeout',
+            "company_name": 'Page load timeout',
+            "city": 'Page load timeout',
+            "state": 'Page load timeout',
+            "country": 'Page load timeout',
+            "work_arrangement": 'Page load timeout',
+            "salary_lower_bound": 0,
+            "salary_upper_bound": 0,
+            "salary_frequency":  'Page load timeout',
+            "currency":  'Page load timeout',
+            "minimum_qualifications": 'Page load timeout'
+        }
 
     def scrape_job_text(self, url) -> str:
-        self.driver.get(url)
-        WebDriverWait(self.driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
-        time.sleep(2)
+        # print(1)
+        # self.driver.get(url)
+        # print(2)
+        self.driver.set_page_load_timeout(11)
+        start_time = time.time()
+        try:
+            self.driver.get(url)
+            print(3)
+            WebDriverWait(self.driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+            print(4)
+            load_time = time.time() - start_time
+            print(f"Page loaded in {load_time} seconds")
+        except TimeoutException:
+            load_time = time.time() - start_time
+            print(f"Timeout after {load_time} seconds")
+            return "Page load timeout"
+
+        # time.sleep(3)
+        print(5)
         soup = BeautifulSoup(self.driver.page_source, "lxml")
         for tag in ['header', 'footer', 'nav']:
             for element in soup.find_all(tag):
@@ -103,8 +133,12 @@ class SeleniumScraper:
 
     # overall method to scrape one listing
     def parse(self, url : str) -> dict:
+
         scraped_text = self.scrape_job_text(url)
-        if (len(scraped_text) > 15000):
+
+        if scraped_text == "Page load timeout":
+            return self.timeout_dict
+        elif (len(scraped_text) > 15000):
             chunked_text = self.chunk_job_text(scraped_text, 15000, 750)
         else:
             chunked_text = self.chunk_job_text(scraped_text, len(scraped_text), 750)
@@ -176,6 +210,9 @@ def aggregate_scraped_results(selenium: SeleniumScraper, url:str) -> dict:
     # populates aggregated_dict by appending the value arrays with each job's returned field
     for i in range(5):
         job_dict = selenium.parse(url)
+        if job_dict['job_title'] == 'Page load timeout':
+            print("Page load timeout, exiting aggregation.")
+            return selenium.timeout_dict
         for field, response_array in aggregated_dict.items():
             response_array.append(job_dict[field])
 
@@ -188,11 +225,15 @@ def aggregate_scraped_results(selenium: SeleniumScraper, url:str) -> dict:
             aggregated_dict[field] = longest_string
         else:
             array_count = Counter(response_array)
-            most_common_string, count = array_count.most_common(1)[0]
-            aggregated_dict[field] = most_common_string
-
-        # attempt to ignore if most common is default
-        # most_common_strings = [string for string, count in array_count.items() if count == highest_count and string != omit_string]
+            most_common_strings = array_count.most_common()
+            default_value = ''
+            if (field == "salary_lower_bound" or field == "salary_upper_bound"):
+                default_value = 0
+            # printer.pprint(most_common_strings)
+            if most_common_strings[0][0] == default_value and len(most_common_strings) > 1:
+                aggregated_dict[field] = most_common_strings[1][0]
+            else:
+                aggregated_dict[field] = most_common_strings[0][0]
 
     print("\nAVERAGED")
     printer.pprint(aggregated_dict)
@@ -262,7 +303,9 @@ intelforce_urls = [
 
 sel = SeleniumScraper()
 
-# aggregate_scraped_results(sel, "https://jobs.netflix.com/jobs/315586427")
+# sel.scrape_job_text("https://jobs.intel.com/en/job/santa-clara/logic-design-methodology-engineer-graduate-intern/41147/60740448336")
+
+aggregate_scraped_results(sel, "https://jobs.intel.com/en/job/santa-clara/logic-design-methodology-engineer-graduate-intern/41147/60740448336")
 
 # for job_url in meta_urls:
 #     aggregate_scraped_results(sel,job_url)
@@ -270,8 +313,10 @@ sel = SeleniumScraper()
 # for job_url in applebox_urls:
 #     aggregate_scraped_results(sel,job_url)
 
-for job_url in microflix_urls:
-    aggregate_scraped_results(sel,job_url)
+# for job_url in microflix_urls:
+#     aggregate_scraped_results(sel,job_url)
 
 # for job_url in intelforce_urls:
 #     aggregate_scraped_results(sel,job_url)
+
+sel.close()
