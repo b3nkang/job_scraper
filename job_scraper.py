@@ -50,7 +50,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import time
 
-
+# a class to instantiate Selenium
 class SeleniumScraper:
     def __init__(self, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
         options = Options()
@@ -58,7 +58,7 @@ class SeleniumScraper:
         options.add_argument(f'user-agent={user_agent}')
         self.driver = webdriver.Chrome(options=options)
 
-    def scrape_job_text(self, url):
+    def scrape_job_text(self, url) -> str:
         self.driver.get(url)
         WebDriverWait(self.driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
         time.sleep(2)
@@ -70,75 +70,52 @@ class SeleniumScraper:
         text = main_content.get_text().replace('\n', ' ').replace('\r', ' ')
         return text
 
+    def chunk_job_text(self, sequence, chunk_size, step=1) -> list[str]:
+        """Generate chunks of data with a sliding window over a sequence.
+
+        Args:
+            sequence (iterable): The sequence to slide the window over.
+            chunk_size (int): The size of each chunk to yield.
+            step (int): The number of elements to slide the window by on each iteration.
+
+        Yields:
+            list: A chunk of the sequence of length `chunk_size`.
+        """
+        # Ensure chunk size and step are positive
+        if chunk_size <= 0:
+            raise ValueError("Chunk size must be a positive integer")
+        if step <= 0:
+            raise ValueError("Step must be a positive integer")
+        chunks = []
+        # Ensure chunk size is not larger than the sequence
+        if chunk_size > len(sequence):
+            chunks.append(sequence)
+            return chunks
+            # raise ValueError("Chunk size cannot be larger than the sequence length")
+        for i in range(0, len(sequence) - chunk_size + 1, step):
+            chunks.append(sequence[i:i + chunk_size])
+        
+        return chunks
+
+    # overall method to scrape one listing
+    def parse(self, url : str) -> dict:
+        scraped_text = self.scrape_job_text(url)
+        if (len(scraped_text) > 15000):
+            chunked_text = self.chunk_job_text(scraped_text, 15000, 750)
+        else:
+            chunked_text = self.chunk_job_text(scraped_text, len(scraped_text), 750)
+        
+        job_json = extract_json(chunked_text).model_dump_json(indent=4)
+        # print(job_details)
+        job_dict = json.loads(job_json)
+        
+        return job_dict
+
     def close(self):
         self.driver.quit()
 
-# def scrape_job_posting(url, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'):
-#     options = Options()
-#     options.add_argument('--headless')
-#     options.add_argument(f"user-agent={user_agent}")
-
-#     driver = webdriver.Chrome(options=options)
-#     driver.get(url)
-
-#     # Wait for the document.readyState to be 'complete'
-#     WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
-
-#     # Wait for AJAX calls as well here
-#     time.sleep(2) #
-
-#     soup = BeautifulSoup(driver.page_source, "lxml")
-
-#     for tag in ['header', 'footer', 'nav']:
-#         for element in soup.find_all(tag):
-#             element.extract()
-
-#     main_content = soup.find(['main', 'article'])
-#     if main_content is None:
-#         main_content = soup
-
-#     text = main_content.get_text().replace('\n', '  ').replace('\r', ' ')
-
-#     driver.quit()
-
-#     return text
-
-
-# stolen from slack
-def sliding_window(sequence, chunk_size, step=1):
-    """Generate chunks of data with a sliding window over a sequence.
-
-    Args:
-        sequence (iterable): The sequence to slide the window over.
-        chunk_size (int): The size of each chunk to yield.
-        step (int): The number of elements to slide the window by on each iteration.
-
-    Yields:
-        list: A chunk of the sequence of length `chunk_size`.
-    """
-    # Ensure chunk size and step are positive
-    if chunk_size <= 0:
-        raise ValueError("Chunk size must be a positive integer")
-    if step <= 0:
-        raise ValueError("Step must be a positive integer")
-        
-    # Ben added:
-    chunks = []
-
-    # Ensure chunk size is not larger than the sequence
-    if chunk_size > len(sequence):
-        chunks.append(sequence)
-        return chunks
-        # raise ValueError("Chunk size cannot be larger than the sequence length")
-
-    # Slide the window over the sequence by 'step' elements each time and yield chunks
-    for i in range(0, len(sequence) - chunk_size + 1, step):
-        chunks.append(sequence[i:i + chunk_size]) # Ben modified from slack
-    
-    return chunks
-
 # Extraction method
-def extract_job_posting_chunks(chunk_list: List[str]):
+def extract_json(chunk_list: List[str]) -> JobDetails:
 
     num_iterations = len(chunk_list)
     job = JobDetails()
@@ -175,23 +152,9 @@ def extract_job_posting_chunks(chunk_list: List[str]):
         job = job.update(new_updates)
     return job
 
-# Scrapes the given url, calls the extraction, and returns it as dict
-def scrape(selenium: SeleniumScraper, url:str):
-    scraped_text = scrape_job_posting(url)
-    chunked_text = ''
+# sel = SeleniumScraper()
 
-    if (len(scraped_text) > 15000):
-        chunked_text = sliding_window(scraped_text, 15000, 750)
-    else:
-        chunked_text = sliding_window(scraped_text, len(scraped_text), 750)
 
-    job_details = extract_job_posting_chunks(chunked_text).model_dump_json(indent=4)
-
-    # print(job_details)
-
-    job_dict = json.loads(job_details)
-
-    return job_dict
 
 # Calls the scrape method multiple times for the same listing, then returns aggregated_dict with each value updated with the most common term
 def aggregate_scraped_results(selenium: SeleniumScraper, url:str):
@@ -211,7 +174,7 @@ def aggregate_scraped_results(selenium: SeleniumScraper, url:str):
 
     # populates aggregated_dict by appending the value arrays with each job's returned field
     for i in range(5):
-        job_dict = selenium.scrape(url)
+        job_dict = selenium.parse(url)
         for field, response_array in aggregated_dict.items():
             response_array.append(job_dict[field])
 
